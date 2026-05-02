@@ -9,6 +9,13 @@ El lanzamiento se debe hacer desde la consolta o terminal de su sistema operativ
 
 python gui.py o python3 gui.py
 
+<img width="1359" height="730" alt="Captura" src="https://github.com/user-attachments/assets/da22efd0-0352-493d-b030-3b368a3434dc" />
+
+
+
+
+
+
 Cualquier duda para su uso me pueden escribir al correo: ricanara1977@gmail.com
 
 Bendiciones!!
