@@ -5,9 +5,18 @@ Para su correcto funcionamiento, el usuario deberá tener instalado en su PC la 
 
 pip install pandas numpy.
 
-El lanzamiento se debe hacer desde la consolta o terminal de su sistema operativo (windows o linux), con el comando:
+El lanzamiento del programa se ejecuta desde la consola o terminal de su sistema operativo (windows o linux), dentro de la carpeta donde se guarde el proyecto con el comando:
 
 python gui.py o python3 gui.py
+
+Ejemplo:  si se desea guardar en C:, podria crear una carpeta ELS y dentro de ella guardar el proyecto, y quedaría en la ruta
+
+C:\ELS
+
+Dentro de esta ruta se abriría la terminal o consola y se ejecutaría el comando 
+
+python gui.py o python3 gui.py
+
 
 <img width="1359" height="730" alt="Captura" src="https://github.com/user-attachments/assets/da22efd0-0352-493d-b030-3b368a3434dc" />
 
