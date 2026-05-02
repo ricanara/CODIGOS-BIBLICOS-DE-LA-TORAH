@@ -1,5 +1,5 @@
 # CODIGOS-BIBLICOS-DE-LA-TORAH
-Buscador de Códigos Bíblicos (ELS).  Este proyecto es una aplicación de escritorio desarrollada en Python, que permite realizar búsquedas en los cinco libros de la Torah, en su idioma original del Hebreo mediante el método de secuencia de letras equidistantes.
+Buscador de Códigos Bíblicos (ELS).  Este proyecto es una aplicación de escritorio desarrollada en Python y con la ayuda de la IA gemini, que permite realizar búsquedas en los cinco libros de la Torah, en su idioma original del Hebreo mediante el método de secuencia de letras equidistantes.
 
 Para su correcto funcionamiento, el usuario deberá tener instalado en su PC la librería estándar de Python 3.x, y las externas  numpy y pandas, que se pueden instalar con
 
