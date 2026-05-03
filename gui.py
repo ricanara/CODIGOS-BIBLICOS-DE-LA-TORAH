@@ -299,8 +299,8 @@ class AplicacionELS:
             H_v = min(int(self.ent_h.get()), self.MAX_F)
         except: return 
         S, P = int(s_anc), int(p_ini)
-        ref_t = gestor.obtener_referencia(self.df_idx, P)
-        self.lbl_info_matriz.config(text=f"ANCLA: {self.ent_ancla.get().upper()} | UBICACIÓN: {ref_t} | SALTO: {S}", fg="#d93025", bg="#fff9c4")
+        
+        # --- Lógica de obtención de matriz ---
         factor = self.division_actual + 1; S_v = S // factor if self.division_actual > 0 else S
         if S_v == 0: S_v = 1 if S > 0 else -1
         pal_a = gestor.normalizar_hebreo(self.ent_ancla.get())
@@ -308,11 +308,17 @@ class AplicacionELS:
         self.matriz_actual_letras, self.matriz_actual_indices = matriz, m_idx
         filas_obtenidas = len(m_idx)        
         self.dicc_pos_rapida = {m_idx[f][c]: (f, c) for f in range(filas_obtenidas) for c in range(W)}
+        
+        # Calcular desfase visual (f_ini)
         lv = len(pal_a) + (len(pal_a)-1)*self.division_actual
         f_ini = int(((80//2) + (lv/2 if S>=0 else -lv/2)) - (H_v/2))
+
+        # Limpiar celdas antes de pintar
         for f in range(self.MAX_F):
             for c in range(self.MAX_C + 2): 
                 self.celdas[f][c].config(text="", bg="white", fg="black"); self.celdas[f][c].grid_remove()
+
+        # Dibujar caracteres base y referencias
         for fg in range(H_v):
             fr = f_ini + fg
             if 0 <= fr < filas_obtenidas and fg < self.MAX_F:
@@ -323,18 +329,30 @@ class AplicacionELS:
                         self.celdas[fg][col_vis].config(text=matriz[fr][c], width=2); self.celdas[fg][col_vis].grid()
                 if W + 1 < self.MAX_C + 2:
                     self.celdas[fg][W+1].config(text=gestor.obtener_referencia(self.df_idx, m_idx[fr][0]), fg="gray", bg="#f8f8f8", width=18, anchor="e"); self.celdas[fg][W+1].grid()
-        for i in range(len(pal_a)):
-            idx = (P + (i * S)) % len(self.texto_actual)
-            if idx in self.dicc_pos_rapida:
-                fm, mc = self.dicc_pos_rapida[idx]; f_vis = fm - f_ini
-                if 0 <= f_vis < H_v and (W - mc) <= self.MAX_C: self.celdas[f_vis][W - mc].config(bg="yellow")
+
+        # --- PINTADO ESTRICTO DE ANCLA ---
+        indices_ancla = [(P + (i * S)) % len(self.texto_actual) for i in range(len(pal_a))]
+        # Solo pintamos si TODA la palabra está en el diccionario de la matriz
+        if all(idx in self.dicc_pos_rapida for idx in indices_ancla):
+            for idx in indices_ancla:
+                fm, mc = self.dicc_pos_rapida[idx]
+                f_vis = fm - f_ini
+                if 0 <= f_vis < H_v: 
+                    self.celdas[f_vis][W - mc].config(bg="yellow")
+
+        # --- PINTADO ESTRICTO DE BÚSQUEDAS EXTRA ---
         for g in self.resultados_secundarios:
             for h in g["hits"]:
                 idxs = [(h["letra_ini"] + (i * h["salto"])) % len(self.texto_actual) for i in range(len(g["palabra"]))]
+                # VERIFICACIÓN CLAVE: que todos los índices existan y estén en el rango visual vertical
                 if all(id in self.dicc_pos_rapida for id in idxs):
-                    for id in idxs:
-                        fm, mc = self.dicc_pos_rapida[id]; f_vis, c_vis = fm - f_ini, W - mc
-                        if 0 <= f_vis < H_v and 0 < c_vis <= self.MAX_C: self.celdas[f_vis][c_vis].config(bg=g["color"])
+                    # Segunda verificación: ¿Están todas las letras dentro de las filas visibles (f_ini a f_ini + H_v)?
+                    if all(0 <= (self.dicc_pos_rapida[id][0] - f_ini) < H_v for id in idxs):
+                        for id in idxs:
+                            fm, mc = self.dicc_pos_rapida[id]
+                            f_vis, c_vis = fm - f_ini, W - mc
+                            if 0 <= f_vis < H_v and 0 < c_vis <= self.MAX_C: 
+                                self.celdas[f_vis][c_vis].config(bg=g["color"])
         
     def ejecutar_busqueda_local(self):
         pal = gestor.normalizar_hebreo(self.ent_local.get().strip())
