@@ -25,6 +25,10 @@ python gui.py o python3 gui.py
 
 
 
+Si lo desean pueden visitar mi canal en youtube: https://www.youtube.com/channel/UCLzQAL1M6ukB2vwnTqIRLbQ
+
+Allí publico algunas investigaciones realizadas con otros programas y proximamente con el mio propio.
+
 Cualquier duda para su uso me pueden escribir al correo: ricanara1977@gmail.com
 
 Bendiciones!!
