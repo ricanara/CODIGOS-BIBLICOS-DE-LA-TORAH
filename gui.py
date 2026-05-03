@@ -207,7 +207,6 @@ class AplicacionELS:
             "busqueda": {"ancla": self.ent_ancla.get(), "extras": [e.get() for e in self.entries_extra]},
             "tabla": [self.tabla.item(i, "values") + (self.tabla.item(i, "tags"),) for i in self.tabla.get_children()],
             "seleccion": self.tabla.item(self.tabla.selection()[0], "tags") if self.tabla.selection() else None,
-            "notas": self.notas_celdas  
         }
         with open(archivo, 'w', encoding='utf-8') as f: json.dump(datos, f, indent=4, ensure_ascii=False)
 
@@ -222,11 +221,7 @@ class AplicacionELS:
         self.ent_min.delete(0, tk.END); self.ent_min.insert(0, datos["config"]["min"])
         self.ent_max.delete(0, tk.END); self.ent_max.insert(0, datos["config"]["max"])
         self.ent_ancla.delete(0, tk.END); self.ent_ancla.insert(0, datos["busqueda"]["ancla"])
-        self.notas_celdas = datos.get("notas", {})
-        for i, t in enumerate(datos["busqueda"]["extras"]): 
-            if i < len(self.entries_extra):
-                self.entries_extra[i].delete(0, tk.END)
-                self.entries_extra[i].insert(0, t)
+        
         self.texto_actual, self.df_idx = gestor.cargar_recursos(self.ruta_datos, self.cb_libro.get())
         for i in self.tabla.get_children(): self.tabla.delete(i)
         for v in datos["tabla"]: self.tabla.insert("", "end", values=v[:3], tags=v[3])
@@ -261,7 +256,7 @@ class AplicacionELS:
         for i in self.tabla.get_children(): self.tabla.delete(i)
         for f in range(self.MAX_F):
             for c in range(self.MAX_C + 2): self.celdas[f][c].config(text="", bg="white", fg="black"); self.celdas[f][c].grid_remove()
-        self.limpiar_busqueda_local(); self.matriz_actual_letras = []; self.matriz_actual_indices = []; self.notas_celdas = {}
+        self.limpiar_busqueda_local(); self.matriz_actual_letras = []; self.matriz_actual_indices = []
         self.lbl_info_matriz.config(text="Seleccione un resultado para ver la matriz", bg="#ffffff", fg="black")
         self.canvas_matriz.config(scrollregion=(0, 0, 0, 0))
 
@@ -422,25 +417,52 @@ class AplicacionELS:
             st = time.time(); self.btn_run.config(text="BUSCANDO...", state="disabled")
             self.texto_actual, self.df_idx = gestor.cargar_recursos(self.ruta_datos, self.cb_libro.get())
             s_min, s_max, W, H = int(self.ent_min.get()), int(self.ent_max.get()), int(self.ent_w.get()), int(self.ent_h.get())
+            
             pal_a = gestor.normalizar_hebreo(self.ent_ancla.get().strip())
             res_a, _ = motor.buscar_els_cilindrico(self.texto_actual, pal_a, s_min, s_max)
+            
             self.resultados_secundarios = []
             for i, ent in enumerate(self.entries_extra):
                 if ent.get().strip():
                     p = gestor.normalizar_hebreo(ent.get().strip())
                     h, _ = motor.buscar_els_cilindrico(self.texto_actual, p, s_min, s_max)
                     self.resultados_secundarios.append({"palabra": p, "hits": h, "color": self.colores_extra[i]})
+            
             for i in self.tabla.get_children(): self.tabla.delete(i)
+            
             for r in res_a:
-                num_e = 0
+                # --- FILTRO DE UMBRAL ESTRICTO ---
+                # Generamos la matriz temporalmente para validar si el ancla cabe
+                # Usamos el mismo alto H configurado para la validación
                 _, m_idx, _, _ = motor.obtener_matriz_vertical_fija(self.texto_actual, r['letra_ini'], r['salto'], W, H)
+                
+                # Diccionario de posiciones para validación rápida
                 vis = {idx for fila in m_idx for idx in fila}
-                for g in self.resultados_secundarios:
-                    for h in g["hits"]:
-                        if all((h["letra_ini"] + (i*h["salto"])) % len(self.texto_actual) in vis for i in range(len(g["palabra"]))): num_e += 1
-                self.tabla.insert("", "end", values=(r['salto'], num_e, gestor.obtener_referencia(self.df_idx, r['letra_ini'])), tags=(r['letra_ini'], r['salto']))
-            self.lbl_timer.config(text=f"Tiempo: {time.time()-st:.2f}s"); self.btn_run.config(text="BUSCAR ENCUENTROS", state="normal")
-        except Exception as e: self.btn_run.config(text="BUSCAR ENCUENTROS", state="normal"); messagebox.showerror("Error", str(e))
+                
+                # Calculamos los índices de la palabra ancla
+                indices_ancla = [(r['letra_ini'] + (i * r['salto'])) % len(self.texto_actual) for i in range(len(pal_a))]
+                
+                # CONDICIÓN CLAVE: Solo proceder si TODA el ancla está dentro del umbral visual[cite: 1]
+                if all(idx in vis for idx in indices_ancla):
+                    num_e = 0
+                    # Contamos encuentros secundarios que también quepan en este mismo umbral[cite: 1]
+                    for g in self.resultados_secundarios:
+                        for h in g["hits"]:
+                            idxs_extra = [(h["letra_ini"] + (i*h["salto"])) % len(self.texto_actual) for i in range(len(g["palabra"]))]
+                            if all(idx_e in vis for idx_e in idxs_extra): 
+                                num_e += 1
+                    
+                    # Insertamos en la tabla solo los que pasaron la validación visual[cite: 1]
+                    self.tabla.insert("", "end", 
+                                      values=(r['salto'], num_e, gestor.obtener_referencia(self.df_idx, r['letra_ini'])), 
+                                      tags=(r['letra_ini'], r['salto']))
+            
+            self.lbl_timer.config(text=f"Tiempo: {time.time()-st:.2f}s")
+            self.btn_run.config(text="BUSCAR ENCUENTROS", state="normal")
+            
+        except Exception as e: 
+            self.btn_run.config(text="BUSCAR ENCUENTROS", state="normal")
+            messagebox.showerror("Error", str(e))
 
     def exportar_matriz_csv(self):
         archivo = filedialog.asksaveasfilename(defaultextension=".csv")
