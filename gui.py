@@ -1,10 +1,9 @@
 import tkinter as tk
-from tkinter import ttk, messagebox, filedialog, simpledialog
+from tkinter import ttk, messagebox, filedialog
 import gestor
 import motor
 import csv
 import time
-import webbrowser
 import os
 import sys
 import json
@@ -36,10 +35,7 @@ class AplicacionELS:
         self.ventana.title("Buscador de Códigos Bíblicos by Alvaro Ricaurte")
         self.ventana.geometry("1600x950")
         
-        if getattr(sys, 'frozen', False):
-            base_path = os.path.dirname(sys.executable)
-        else:
-            base_path = os.path.dirname(os.path.abspath(__file__))
+        base_path = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
         
         self.ruta_datos = os.path.join(base_path, "DATA")
         self.texto_actual = None 
@@ -141,7 +137,6 @@ class AplicacionELS:
         self.frame_tools = tk.Frame(self.frame_der, pady=8, bg="#f0f0f0", relief=tk.RAISED, bd=1)
         self.frame_tools.pack(fill="x")
 
-        # Gestión de Sesión
         tk.Button(self.frame_tools, text="📁 ABRIR", bg="#fff176", command=self.cargar_sesion).pack(side=tk.LEFT, padx=5)
         tk.Button(self.frame_tools, text="💾 GUARDAR", bg="#81c784", command=self.guardar_sesion).pack(side=tk.LEFT, padx=5)
         ttk.Separator(self.frame_tools, orient=tk.VERTICAL).pack(side=tk.LEFT, fill="y", padx=10)
@@ -162,7 +157,6 @@ class AplicacionELS:
         tk.Button(self.frame_tools, text="BUSCAR", bg="#34a853", fg="white", command=self.ejecutar_busqueda_local).pack(side=tk.LEFT, padx=2)
         tk.Button(self.frame_tools, text="LIMPIAR", bg="#5f6368", fg="white", command=self.limpiar_busqueda_local).pack(side=tk.LEFT, padx=2)
 
-        # Alcance
         tk.Label(self.frame_tools, text="alcance:", font=("Arial", 9, "bold"), bg="#f0f0f0").pack(side=tk.LEFT, padx=(10, 2))
         self.lbl_rango_val = tk.Label(self.frame_tools, text=str(self.rango_local), width=2, bg="white", relief="sunken")
         self.lbl_rango_val.pack(side=tk.LEFT, padx=2)
@@ -196,49 +190,99 @@ class AplicacionELS:
                 es_ref = (c == 0 or c == self.MAX_C + 1)
                 lbl = tk.Label(self.grid_wrapper, text="", width=2 if not es_ref else 20, font=("Courier New", self.font_size), bg="white", borderwidth=0)
                 lbl.grid(row=f, column=c, padx=0, pady=0); lbl.grid_remove()
-                fila_l.append(lbl)
+                fila_l.append(lbl) 
             self.celdas.append(fila_l)
 
     def guardar_sesion(self):
         archivo = filedialog.asksaveasfilename(defaultextension=".json", filetypes=[("JSON files", "*.json")])
         if not archivo: return
-        datos = {
-            "config": {"libro": self.cb_libro.get(), "w": self.ent_w.get(), "h": self.ent_h.get(), "min": self.ent_min.get(), "max": self.ent_max.get()},
-            "busqueda": {"ancla": self.ent_ancla.get(), "extras": [e.get() for e in self.entries_extra]},
-            "tabla": [self.tabla.item(i, "values") + (self.tabla.item(i, "tags"),) for i in self.tabla.get_children()],
-            "seleccion": self.tabla.item(self.tabla.selection()[0], "tags") if self.tabla.selection() else None,
-        }
-        with open(archivo, 'w', encoding='utf-8') as f: json.dump(datos, f, indent=4, ensure_ascii=False)
+        
+        try:
+            datos = {
+                "config": {
+                    "libro": self.cb_libro.get(), 
+                    "w": self.ent_w.get(), 
+                    "h": self.ent_h.get(), 
+                    "min": self.ent_min.get(), 
+                    "max": self.ent_max.get()
+                },
+                "busqueda": {
+                    "ancla": self.ent_ancla.get(), 
+                    "extras": [e.get() for e in self.entries_extra]
+                },
+                "tabla": [self.tabla.item(i, "values") + (self.tabla.item(i, "tags"),) for i in self.tabla.get_children()],
+                "seleccion": self.tabla.item(self.tabla.selection()[0], "tags") if self.tabla.selection() else None,
+            }
+            
+            with open(archivo, 'w', encoding='utf-8') as f:
+                json.dump(datos, f, indent=4, ensure_ascii=False)
+            
+            messagebox.showinfo("Sesión Guardada", "La sesión se ha guardado correctamente.")
+            
+        except Exception as e:
+            messagebox.showerror("Error al Guardar", f"No se pudo guardar la sesión:\n{e}")
 
     def cargar_sesion(self):
         archivo = filedialog.askopenfilename(filetypes=[("JSON files", "*.json")])
         if not archivo: return
-        with open(archivo, 'r', encoding='utf-8') as f: 
-            datos = json.load(f)
-        self.cb_libro.set(datos["config"]["libro"])
-        self.ent_w.delete(0, tk.END); self.ent_w.insert(0, datos["config"]["w"])
-        self.ent_h.delete(0, tk.END); self.ent_h.insert(0, datos["config"]["h"])
-        self.ent_min.delete(0, tk.END); self.ent_min.insert(0, datos["config"]["min"])
-        self.ent_max.delete(0, tk.END); self.ent_max.insert(0, datos["config"]["max"])
-        self.ent_ancla.delete(0, tk.END); self.ent_ancla.insert(0, datos["busqueda"]["ancla"])
         
-        self.texto_actual, self.df_idx = gestor.cargar_recursos(self.ruta_datos, self.cb_libro.get())
-        for i in self.tabla.get_children(): self.tabla.delete(i)
-        for v in datos["tabla"]: self.tabla.insert("", "end", values=v[:3], tags=v[3])
-        self.resultados_secundarios = []
-        for i, ent in enumerate(self.entries_extra):
-            val = ent.get().strip()
-            if val:
-                pal = gestor.normalizar_hebreo(val)
-                hits, _ = motor.buscar_els_cilindrico(self.texto_actual, pal, int(self.ent_min.get()), int(self.ent_max.get()))
-                self.resultados_secundarios.append({"palabra": pal, "hits": hits, "color": self.colores_extra[i]})
-        seleccion_previa = datos.get("seleccion")
-        if seleccion_previa:
-            target_tags = list(seleccion_previa)
-            for item in self.tabla.get_children():
-                if list(self.tabla.item(item, "tags")) == target_tags:
-                    self.tabla.selection_set(item); self.tabla.focus(item); self.actualizar_visor(None); break
+        try:
+            with open(archivo, 'r', encoding='utf-8') as f:
+                datos = json.load(f)
+            
+            self.cb_libro.set(datos["config"]["libro"])
+            entradas = [self.ent_w, self.ent_h, self.ent_min, self.ent_max, self.ent_ancla]
+            valores = [
+                datos["config"]["w"], 
+                datos["config"]["h"], 
+                datos["config"]["min"], 
+                datos["config"]["max"], 
+                datos["busqueda"]["ancla"]
+            ]
+            
+            for k, v in zip(entradas, valores):
+                k.delete(0, tk.END)
+                k.insert(0, v)
+            
+            for i, val_extra in enumerate(datos["busqueda"]["extras"]):
+                if i < len(self.entries_extra):
+                    self.entries_extra[i].delete(0, tk.END)
+                    self.entries_extra[i].insert(0, val_extra)
 
+            self.texto_actual, self.df_idx = gestor.cargar_recursos(self.ruta_datos, self.cb_libro.get())
+            for i in self.tabla.get_children():
+                self.tabla.delete(i)
+            
+            for v in datos["tabla"]:
+                self.tabla.insert("", "end", values=v[:3], tags=v[3])
+            
+            self.resultados_secundarios = []
+            s_min, s_max = int(self.ent_min.get()), int(self.ent_max.get())
+            for i, ent in enumerate(self.entries_extra):
+                val = ent.get().strip()
+                if val:
+                    pal = gestor.normalizar_hebreo(val)
+                    hits, _ = motor.buscar_els_cilindrico(self.texto_actual, pal, s_min, s_max)
+                    self.resultados_secundarios.append({
+                        "palabra": pal, 
+                        "hits": hits, 
+                        "color": self.colores_extra[i]
+                    })
+            
+            if datos.get("seleccion"):
+                target = list(datos["seleccion"])
+                for item in self.tabla.get_children():
+                    if list(self.tabla.item(item, "tags")) == target:
+                        self.tabla.selection_set(item)
+                        self.tabla.focus(item)
+                        self.actualizar_visor(None)
+                        break
+            
+            messagebox.showinfo("Sesión Cargada", "La sesión se ha restaurado correctamente.")
+            
+        except Exception as e:
+            messagebox.showerror("Error al Cargar", f"No se pudo cargar el archivo de sesión:\n{e}")
+            
     def salir_programa(self):
         if messagebox.askokcancel("Salir", "¿Desea cerrar el programa?"): self.ventana.destroy(); os._exit(0)
 
@@ -246,13 +290,12 @@ class AplicacionELS:
     def ordenar_columna(self, col, reverse):
         l = [(self.tabla.set(k, col), k) for k in self.tabla.get_children('')]
         try: l.sort(key=lambda t: float(t[0]), reverse=reverse)
-        except ValueError: l.sort(reverse=reverse)
-        for index, (val, k) in enumerate(l): self.tabla.move(k, '', index)
+        except: l.sort(reverse=reverse)
+        for i, (val, k) in enumerate(l): self.tabla.move(k, '', i)
         self.tabla.heading(col, command=lambda: self.ordenar_columna(col, not reverse))
 
     def limpiar_todo(self):
-        self.ent_ancla.delete(0, tk.END); self.ent_local.delete(0, tk.END)
-        for ent in self.entries_extra: ent.delete(0, tk.END)
+        for e in [self.ent_ancla, self.ent_local] + self.entries_extra: e.delete(0, tk.END)
         for i in self.tabla.get_children(): self.tabla.delete(i)
         for f in range(self.MAX_F):
             for c in range(self.MAX_C + 2): self.celdas[f][c].config(text="", bg="white", fg="black"); self.celdas[f][c].grid_remove()
@@ -262,8 +305,8 @@ class AplicacionELS:
 
     def set_division(self, d): self.division_actual = d; self.actualizar_visor(None)
     def ajustar_rango_local(self, delta):
-        nv = self.rango_local + delta
-        if 1 <= nv <= 20: self.rango_local = nv; self.lbl_rango_val.config(text=str(nv))
+        self.rango_local = max(1, min(20, self.rango_local + delta))
+        self.lbl_rango_val.config(text=str(self.rango_local))
 
     def set_foco(self, entry): self.ultimo_foco = entry
     def abrir_teclado(self): TecladoHebreo(self.ventana, self.insertar_letra, self.borrar_letra)
@@ -271,120 +314,121 @@ class AplicacionELS:
         if self.ultimo_foco: self.ultimo_foco.insert(tk.INSERT, letra)
     def borrar_letra(self):
         if self.ultimo_foco:
-            pos = self.ultimo_foco.index(tk.INSERT)
-            if pos > 0: self.ultimo_foco.delete(pos-1, pos)
+            p = self.ultimo_foco.index(tk.INSERT)
+            if p > 0: self.ultimo_foco.delete(p-1, p)
 
     def ajustar_dim(self, entry, delta):
         try:
-            val = int(entry.get()); nv = max(5, min(self.MAX_C, val + delta))
+            nv = max(5, min(self.MAX_C, int(entry.get()) + delta))
             entry.delete(0, tk.END); entry.insert(0, str(nv)); self.actualizar_visor(None)
         except: pass
 
     def cambiar_fuente(self, delta):
         self.font_size = max(6, min(72, self.font_size + delta))
+        fnt = ("Courier New", self.font_size)
         for f in range(self.MAX_F):
-            for c in range(self.MAX_C + 2): self.celdas[f][c].config(font=("Courier New", self.font_size))
+            for c in range(self.MAX_C + 2): self.celdas[f][c].config(font=fnt)
         self.actualizar_visor(None)
 
     def actualizar_visor(self, event):
         if not self.tabla.selection(): return
         item = self.tabla.selection()[0]
-        p_ini, s_anc = self.tabla.item(item, "tags")
+        p_ini, s_anc = map(int, self.tabla.item(item, "tags"))
         
         try: 
-            W = min(int(self.ent_w.get()), self.MAX_C)
-            H_v = min(int(self.ent_h.get()), self.MAX_F)
+            W, H_v = min(int(self.ent_w.get()), self.MAX_C), min(int(self.ent_h.get()), self.MAX_F)
         except: return 
         
-        S, P = int(s_anc), int(p_ini)
-        
-        # --- NUEVA LÓGICA DE INFORMACIÓN SOBRE LA MATRIZ ---
-        # Obtenemos la referencia legible (Libro, Cap, Ver) usando pandas
-        ref_texto = gestor.obtener_referencia(self.df_idx, P) 
-        
-        # Actualizamos la etiqueta con el formato solicitado y colores resaltados
-        self.lbl_info_matriz.config(
-            text=f"ANCLA: {self.ent_ancla.get().upper()}  |  UBICACIÓN: {ref_texto}  |  SALTO: {S}",
-            fg="#d93025",  # Rojo oscuro para resaltar
-            bg="#fff9c4"   # Amarillo suave de fondo
-        )
-        # --------------------------------------------------
+        ref_texto = gestor.obtener_referencia(self.df_idx, p_ini) 
+        self.lbl_info_matriz.config(text=f"ANCLA: {self.ent_ancla.get().upper()}  |  UBICACIÓN: {ref_texto}  |  SALTO: {s_anc}", fg="#d93025", bg="#fff9c4")
 
-        # --- Lógica de obtención de matriz ---
         factor = self.division_actual + 1
-        S_v = S // factor if self.division_actual > 0 else S
-        if S_v == 0: S_v = 1 if S > 0 else -1
+        s_v = (s_anc // factor) if self.division_actual > 0 else s_anc
+        if s_v == 0: s_v = 1 if s_anc > 0 else -1
         
         pal_a = gestor.normalizar_hebreo(self.ent_ancla.get())
-        # El motor procesa la matriz usando los índices y el texto actual
-        matriz, m_idx, _, _ = motor.obtener_matriz_vertical_fija(self.texto_actual, P, S_v, W, 80)
+        matriz, m_idx, _, _ = motor.obtener_matriz_vertical_fija(self.texto_actual, p_ini, s_v, W, 80)
         self.matriz_actual_letras, self.matriz_actual_indices = matriz, m_idx
-        filas_obtenidas = len(m_idx)        
+        filas_obt = len(m_idx)        
+        self.dicc_pos_rapida = {m_idx[f][c]: (f, c) for f in range(filas_obt) for c in range(W)}
         
-        # Diccionario para posicionamiento rápido de letras en la rejilla[cite: 1]
-        self.dicc_pos_rapida = {m_idx[f][c]: (f, c) for f in range(filas_obtenidas) for c in range(W)}
-        
-        # Calcular desfase visual (f_ini) para centrar el ancla[cite: 1]
         lv = len(pal_a) + (len(pal_a)-1)*self.division_actual
-        f_ini = int(((80//2) + (lv/2 if S>=0 else -lv/2)) - (H_v/2))
+        f_ini = int(((80//2) + (lv/2 if s_anc>=0 else -lv/2)) - (H_v/2))
 
-        # Limpiar celdas antes de pintar
+        # 1. Limpieza de celdas
         for f in range(self.MAX_F):
             for c in range(self.MAX_C + 2): 
                 self.celdas[f][c].config(text="", bg="white", fg="black")
                 self.celdas[f][c].grid_remove()
 
-        # Dibujar caracteres base y referencias laterales[cite: 1]
+        # 2. Dibujo de la matriz y referencias
         for fg in range(H_v):
             fr = f_ini + fg
-            if 0 <= fr < filas_obtenidas and fg < self.MAX_F:
-                # Referencia izquierda
+            if 0 <= fr < filas_obt:
                 self.celdas[fg][0].config(text=gestor.obtener_referencia(self.df_idx, m_idx[fr][W-1]), fg="gray", bg="#f8f8f8", width=18, anchor="w")
                 self.celdas[fg][0].grid()
-                
-                # Letras hebreas (de derecha a izquierda según col_vis)[cite: 1]
                 for c in range(W):
-                    col_vis = W - c
-                    if col_vis <= self.MAX_C:
-                        self.celdas[fg][col_vis].config(text=matriz[fr][c], width=2)
-                        self.celdas[fg][col_vis].grid()
-                
-                # Referencia derecha
+                    cv = W - c
+                    if cv <= self.MAX_C:
+                        self.celdas[fg][cv].config(text=matriz[fr][c], width=2); self.celdas[fg][cv].grid()
                 if W + 1 < self.MAX_C + 2:
                     self.celdas[fg][W+1].config(text=gestor.obtener_referencia(self.df_idx, m_idx[fr][0]), fg="gray", bg="#f8f8f8", width=18, anchor="e")
                     self.celdas[fg][W+1].grid()
 
-        # --- PINTADO ESTRICTO DE ANCLA (Resaltado en amarillo)[cite: 1] ---
-        indices_ancla = [(P + (i * S)) % len(self.texto_actual) for i in range(len(pal_a))]
-        if all(idx in self.dicc_pos_rapida for idx in indices_ancla):
-            for idx in indices_ancla:
+        # 3. Pintado del ANCLA (Amarillo)
+        indices_ancla = [(p_ini + (i * s_anc)) % len(self.texto_actual) for i in range(len(pal_a))]
+        for idx in indices_ancla:
+            if idx in self.dicc_pos_rapida:
                 fm, mc = self.dicc_pos_rapida[idx]
                 f_vis = fm - f_ini
-                if 0 <= f_vis < H_v: 
-                    self.celdas[f_vis][W - mc].config(bg="yellow")
+                if 0 <= f_vis < H_v: self.celdas[f_vis][W - mc].config(bg="yellow")
 
-        # --- PINTADO ESTRICTO DE BÚSQUEDAS EXTRA[cite: 1] ---
+        # 4. --- PINTADO DINÁMICO DE ENCUENTROS EXTRA ---
+        # Paleta de colores para diferenciar cada encuentro individual
+        colores_extra_dinamicos = [
+            "#FFB6C1", "#90EE90", "#ADD8E6", "#FFD700", "#E6E6FA", 
+            "#F5DEB3", "#B0E0E6", "#D8BFD8", "#F0E68C", "#AFEEEE",
+            "#FF7F50", "#7FFFD4", "#DEB887", "#98FB98", "#B0C4DE"
+        ]
+        color_idx = 0
+
         for g in self.resultados_secundarios:
             for h in g["hits"]:
+                # Obtener índices de la palabra completa
                 idxs = [(h["letra_ini"] + (i * h["salto"])) % len(self.texto_actual) for i in range(len(g["palabra"]))]
-                if all(id in self.dicc_pos_rapida for id in idxs):
-                    if all(0 <= (self.dicc_pos_rapida[id][0] - f_ini) < H_v for id in idxs):
-                        for id in idxs:
-                            fm, mc = self.dicc_pos_rapida[id]
-                            f_vis, c_vis = fm - f_ini, W - mc
-                            if 0 <= f_vis < H_v and 0 < c_vis <= self.MAX_C: 
-                                self.celdas[f_vis][c_vis].config(bg=g["color"])
+                
+                # Verificar si TODAS las letras están en la matriz total
+                if all(idx in self.dicc_pos_rapida for idx in idxs):
+                    esta_completa_en_pantalla = True
+                    coordenadas_a_pintar = []
+                    
+                    for idx in idxs:
+                        fm, mc = self.dicc_pos_rapida[idx]
+                        f_vis = fm - f_ini
+                        # Verificar si la letra cae dentro del umbral visual (H_v)
+                        if 0 <= f_vis < H_v:
+                            coordenadas_a_pintar.append((f_vis, W - mc))
+                        else:
+                            esta_completa_en_pantalla = False
+                            break
+                    
+                    # Solo pintamos si la palabra se ve completa en el visor
+                    if esta_completa_en_pantalla:
+                        # Asignamos un color de la paleta y rotamos para el siguiente encuentro
+                        color_actual = colores_extra_dinamicos[color_idx % len(colores_extra_dinamicos)]
+                        for f_v, c_v in coordenadas_a_pintar:
+                            if 0 < c_v <= self.MAX_C:
+                                self.celdas[f_v][c_v].config(bg=color_actual)
+                        color_idx += 1
         
     def ejecutar_busqueda_local(self):
         pal = gestor.normalizar_hebreo(self.ent_local.get().strip())
         if not pal or not self.matriz_actual_letras: return
         H_v, W = int(self.ent_h.get()), int(self.ent_w.get())
-        item = self.tabla.selection()[0]; _, s_anc = self.tabla.item(item, "tags")
-        pal_ancla_norm = gestor.normalizar_hebreo(self.ent_ancla.get())
-        lv = len(pal_ancla_norm) + (len(pal_ancla_norm)-1)*self.division_actual
-        f_ini = int(((80//2) + (lv/2 if int(s_anc)>=0 else -lv/2)) - (H_v/2))
-        filas_m = len(self.matriz_actual_letras)
-        m_n = [[gestor.normalizar_hebreo(lt) for lt in f] for f in self.matriz_actual_letras]
+        s_anc = int(self.tabla.item(self.tabla.selection()[0], "tags")[1])
+        lv = len(gestor.normalizar_hebreo(self.ent_ancla.get())) + (len(gestor.normalizar_hebreo(self.ent_ancla.get()))-1)*self.division_actual
+        f_ini = int(((80//2) + (lv/2 if s_anc>=0 else -lv/2)) - (H_v/2))
+        filas_m, m_n = len(self.matriz_actual_letras), [[gestor.normalizar_hebreo(lt) for lt in f] for f in self.matriz_actual_letras]
         enc = False
         for f1 in range(filas_m):
             for c1 in range(W):
@@ -397,14 +441,10 @@ class AplicacionELS:
                                 nf, nc = f1+(i*df), c1+(i*dc)
                                 if 0<=nf<filas_m and 0<=nc<W and m_n[nf][nc]==pal[i]: pts.append((nf,nc))
                                 else: break
-                            if len(pts) == len(pal):
-                                v = True
-                                for mf, mc in pts:
-                                    if not (0 <= mf-f_ini < H_v): v = False; break
-                                if v:
-                                    for mf, mc in pts: 
-                                        if (W-mc) <= self.MAX_C: self.celdas[mf-f_ini][W-mc].config(bg=self.colores_local[self.idx_color_local_persistente % 6], fg="white")
-                                    enc = True
+                            if len(pts) == len(pal) and all(0 <= mf-f_ini < H_v for mf, mc in pts):
+                                for mf, mc in pts: 
+                                    if (W-mc) <= self.MAX_C: self.celdas[mf-f_ini][W-mc].config(bg=self.colores_local[self.idx_color_local_persistente % 6], fg="white")
+                                enc = True
         if enc: self.idx_color_local_persistente += 1
 
     def limpiar_busqueda_local(self):
@@ -417,188 +457,55 @@ class AplicacionELS:
             st = time.time(); self.btn_run.config(text="BUSCANDO...", state="disabled")
             self.texto_actual, self.df_idx = gestor.cargar_recursos(self.ruta_datos, self.cb_libro.get())
             s_min, s_max, W, H = int(self.ent_min.get()), int(self.ent_max.get()), int(self.ent_w.get()), int(self.ent_h.get())
-            
             pal_a = gestor.normalizar_hebreo(self.ent_ancla.get().strip())
             res_a, _ = motor.buscar_els_cilindrico(self.texto_actual, pal_a, s_min, s_max)
-            
-            self.resultados_secundarios = []
-            for i, ent in enumerate(self.entries_extra):
-                if ent.get().strip():
-                    p = gestor.normalizar_hebreo(ent.get().strip())
-                    h, _ = motor.buscar_els_cilindrico(self.texto_actual, p, s_min, s_max)
-                    self.resultados_secundarios.append({"palabra": p, "hits": h, "color": self.colores_extra[i]})
-            
+            self.resultados_secundarios = [{"palabra": gestor.normalizar_hebreo(e.get().strip()), "hits": motor.buscar_els_cilindrico(self.texto_actual, gestor.normalizar_hebreo(e.get().strip()), s_min, s_max)[0], "color": self.colores_extra[i]} for i, e in enumerate(self.entries_extra) if e.get().strip()]
             for i in self.tabla.get_children(): self.tabla.delete(i)
-            
             for r in res_a:
-                # --- FILTRO DE UMBRAL ESTRICTO ---
-                # Generamos la matriz temporalmente para validar si el ancla cabe
-                # Usamos el mismo alto H configurado para la validación
                 _, m_idx, _, _ = motor.obtener_matriz_vertical_fija(self.texto_actual, r['letra_ini'], r['salto'], W, H)
-                
-                # Diccionario de posiciones para validación rápida
                 vis = {idx for fila in m_idx for idx in fila}
-                
-                # Calculamos los índices de la palabra ancla
-                indices_ancla = [(r['letra_ini'] + (i * r['salto'])) % len(self.texto_actual) for i in range(len(pal_a))]
-                
-                # CONDICIÓN CLAVE: Solo proceder si TODA el ancla está dentro del umbral visual[cite: 1]
-                if all(idx in vis for idx in indices_ancla):
-                    num_e = 0
-                    # Contamos encuentros secundarios que también quepan en este mismo umbral[cite: 1]
-                    for g in self.resultados_secundarios:
-                        for h in g["hits"]:
-                            idxs_extra = [(h["letra_ini"] + (i*h["salto"])) % len(self.texto_actual) for i in range(len(g["palabra"]))]
-                            if all(idx_e in vis for idx_e in idxs_extra): 
-                                num_e += 1
-                    
-                    # Insertamos en la tabla solo los que pasaron la validación visual[cite: 1]
-                    self.tabla.insert("", "end", 
-                                      values=(r['salto'], num_e, gestor.obtener_referencia(self.df_idx, r['letra_ini'])), 
-                                      tags=(r['letra_ini'], r['salto']))
-            
-            self.lbl_timer.config(text=f"Tiempo: {time.time()-st:.2f}s")
-            self.btn_run.config(text="BUSCAR ENCUENTROS", state="normal")
-            
+                if all(((r['letra_ini'] + (i * r['salto'])) % len(self.texto_actual)) in vis for i in range(len(pal_a))):
+                    num_e = sum(1 for g in self.resultados_secundarios for h in g["hits"] if all(((h["letra_ini"] + (i*h["salto"])) % len(self.texto_actual)) in vis for i in range(len(g["palabra"]))))
+                    self.tabla.insert("", "end", values=(r['salto'], num_e, gestor.obtener_referencia(self.df_idx, r['letra_ini'])), tags=(r['letra_ini'], r['salto']))
+            self.lbl_timer.config(text=f"Tiempo: {time.time()-st:.2f}s"); self.btn_run.config(text="BUSCAR ENCUENTROS", state="normal")
         except Exception as e: 
-            self.btn_run.config(text="BUSCAR ENCUENTROS", state="normal")
-            messagebox.showerror("Error", str(e))
+            self.btn_run.config(text="BUSCAR ENCUENTROS", state="normal"); messagebox.showerror("Error", str(e))
 
     def exportar_matriz_csv(self):
         archivo = filedialog.asksaveasfilename(defaultextension=".csv")
         if not archivo or not self.matriz_actual_letras: return
         try:
-            W = int(self.ent_w.get())
-            H = int(self.ent_h.get())
-            pal_a = self.ent_ancla.get()
-            libro = self.cb_libro.get()
-            seleccion = self.tabla.selection()
-            if seleccion:
-                item = seleccion[0]
-                _, s_anc = self.tabla.item(item, "tags")
-            else:
-                s_anc = "N/A"
-            encabezado_texto = f"ANCLA: {pal_a}  |  LIBRO: {libro}  |  SALTO: {s_anc}"
+            W, H = int(self.ent_w.get()), int(self.ent_h.get())
+            s_anc = self.tabla.item(self.tabla.selection()[0], "tags")[1] if self.tabla.selection() else "N/A"
             with open(archivo, mode='w', newline='', encoding='utf-8-sig') as f:
                 writer = csv.writer(f)
-                writer.writerow([encabezado_texto])
+                writer.writerow([f"ANCLA: {self.ent_ancla.get()}  |  LIBRO: {self.cb_libro.get()}  |  SALTO: {s_anc}"])
                 writer.writerow([])
                 for f_idx in range(H):
-                    fila_datos = []
-                    for c_idx in range(W + 2):
-                        celda = self.celdas[f_idx][c_idx]
-                        texto = celda.cget("text")
-                        if celda.winfo_viewable() or texto != "":
-                            fila_datos.append(texto)
-                    if fila_datos:
-                        writer.writerow(fila_datos)
+                    row = [self.celdas[f_idx][c].cget("text") for c in range(W+2) if self.celdas[f_idx][c].winfo_viewable() or self.celdas[f_idx][c].cget("text") != ""]
+                    if row: writer.writerow(row)
             messagebox.showinfo("Éxito", "Matriz exportada a CSV correctamente.")
-        except Exception as e:
-            messagebox.showerror("Error", f"No se pudo exportar el CSV: {e}")
+        except Exception as e: messagebox.showerror("Error", f"No se pudo exportar el CSV: {e}")
 
     def exportar_matriz_html(self):
         archivo = filedialog.asksaveasfilename(defaultextension=".html")
-        if not archivo or not self.matriz_actual_letras: return
+        if not archivo or not self.matriz_actual_letras or not self.tabla.selection(): return
         try:
-            W = int(self.ent_w.get())
-            H = int(self.ent_h.get())
-            pal_a = gestor.normalizar_hebreo(self.ent_ancla.get())
-            libro = self.cb_libro.get()
-            seleccion = self.tabla.selection()
-            if not seleccion:
-                messagebox.showwarning("Aviso", "Seleccione un resultado en la tabla antes de exportar.")
-                return
-            item = seleccion[0]
-            _, s_anc = self.tabla.item(item, "tags")
-        except Exception as e: 
-            messagebox.showerror("Error", f"Error al preparar datos: {e}")
-            return
-        html = f"""
-        <html>
-        <head>
-            <meta charset='UTF-8'>
-            <style>
-                body {{ 
-                    background-color: #f0f7f0; 
-                    font-family: 'Segoe UI', sans-serif; 
-                    padding: 40px; 
-                    display: flex; 
-                    flex-direction: column; 
-                    align-items: center; 
-                }}
-                .header-card {{
-                    background: #ffffff;
-                    padding: 20px 40px;
-                    border-radius: 12px;
-                    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-                    border-left: 6px solid #2e7d32;
-                    margin-bottom: 30px;
-                    text-align: center;
-                    min-width: 600px;
-                }}
-                .header-card h2 {{ margin: 0; color: #1b5e20; font-size: 22px; }}
-                .header-card p {{ margin: 8px 0 0; color: #666; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }}
-                table {{
-                    border-collapse: separate;
-                    border-spacing: 2px;
-                    background-color: #ffffff;
-                    padding: 25px;
-                    border-radius: 10px;
-                    box-shadow: 0 15px 35px rgba(0,0,0,0.1);
-                }}
-                td {{
-                    width: 32px;
-                    height: 32px;
-                    text-align: center;
-                    font-family: 'Courier New', monospace;
-                    font-size: 18px;
-                    font-weight: bold;
-                    border-radius: 4px;
-                    border: 1px solid #f0f0f0;
-                }}
-                .ref {{
-                    font-size: 11px;
-                    color: #2e7d32;
-                    background-color: #e8f5e9 !important;
-                    min-width: 150px;
-                    padding: 0 12px;
-                }}
-            </style>
-        </head>
-        <body>
-            <div class='header-card'>
-                <h2>INFORME DE BÚSQUEDA ELS</h2>
-                <p>ANCLA: <b>{pal_a}</b> &nbsp;|&nbsp; LIBRO: <b>{libro}</b> &nbsp;|&nbsp; SALTO: <b>{s_anc}</b></p>
-            </div>
-            <table>
-        """
-        for f_idx in range(H):
-            html += "<tr>"
-            for c_idx in range(W + 2):
-                celda = self.celdas[f_idx][c_idx]
-                texto = celda.cget("text")
-                bg_color = celda.cget("bg")
-                fg_color = celda.cget("fg")
-                es_ref = (c_idx == 0 or c_idx == W + 1)
-                if es_ref:
-                    clase = "class='ref'"
-                    estilo_celda = "" 
-                else:
-                    clase = ""
-                    if bg_color.lower() in ["white", "#ffffff", "systembuttonface"]:
-                        estilo_celda = f"background-color: #ffffff; color: {fg_color};"
-                    else:
-                        estilo_celda = f"background-color: {bg_color}; color: {fg_color};"
-                if celda.winfo_viewable() or texto != "":
-                    html += f"<td {clase} style='{estilo_celda}'>{texto}</td>"
-            html += "</tr>"
-        html += "</table></body></html>"
-        try:
-            with open(archivo, "w", encoding="utf-8") as f: 
-                f.write(html)
+            W, H, s_anc = int(self.ent_w.get()), int(self.ent_h.get()), self.tabla.item(self.tabla.selection()[0], "tags")[1]
+            html = f"<html><head><meta charset='UTF-8'><style>body {{ background-color: #f0f7f0; font-family: 'Segoe UI', sans-serif; padding: 40px; display: flex; flex-direction: column; align-items: center; }} .header-card {{ background: #ffffff; padding: 20px 40px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-left: 6px solid #2e7d32; margin-bottom: 30px; text-align: center; min-width: 600px; }} .header-card h2 {{ margin: 0; color: #1b5e20; font-size: 22px; }} .header-card p {{ margin: 8px 0 0; color: #666; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }} table {{ border-collapse: separate; border-spacing: 2px; background-color: #ffffff; padding: 25px; border-radius: 10px; box-shadow: 0 15px 35px rgba(0,0,0,0.1); }} td {{ width: 32px; height: 32px; text-align: center; font-family: 'Courier New', monospace; font-size: 18px; font-weight: bold; border-radius: 4px; border: 1px solid #f0f0f0; }} .ref {{ font-size: 11px; color: #2e7d32; background-color: #e8f5e9 !important; min-width: 150px; padding: 0 12px; }} </style></head><body><div class='header-card'><h2>INFORME DE BÚSQUEDA ELS</h2><p>ANCLA: <b>{gestor.normalizar_hebreo(self.ent_ancla.get())}</b> &nbsp;|&nbsp; LIBRO: <b>{self.cb_libro.get()}</b> &nbsp;|&nbsp; SALTO: <b>{s_anc}</b></p></div><table>"
+            for f_idx in range(H):
+                html += "<tr>"
+                for c_idx in range(W + 2):
+                    celda = self.celdas[f_idx][c_idx]
+                    txt, bg, fg = celda.cget("text"), celda.cget("bg"), celda.cget("fg")
+                    if celda.winfo_viewable() or txt != "":
+                        clase = "class='ref'" if (c_idx==0 or c_idx==W+1) else ""
+                        estilo = f"background-color: {bg if bg.lower() not in ['white', '#ffffff', 'systembuttonface'] else '#ffffff'}; color: {fg};"
+                        html += f"<td {clase} style='{estilo}'>{txt}</td>"
+                html += "</tr>"
+            with open(archivo, "w", encoding="utf-8") as f: f.write(html + "</table></body></html>")
             messagebox.showinfo("Éxito", "Matriz exportada a HTML correctamente.")
-        except Exception as e:
-            messagebox.showerror("Error", f"No se pudo exportar: {e}")
+        except Exception as e: messagebox.showerror("Error", f"No se pudo exportar: {e}")
 
 if __name__ == "__main__":
     root = tk.Tk(); app = AplicacionELS(root); root.mainloop()
