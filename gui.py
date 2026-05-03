@@ -293,46 +293,74 @@ class AplicacionELS:
 
     def actualizar_visor(self, event):
         if not self.tabla.selection(): return
-        item = self.tabla.selection()[0]; p_ini, s_anc = self.tabla.item(item, "tags")
+        item = self.tabla.selection()[0]
+        p_ini, s_anc = self.tabla.item(item, "tags")
+        
         try: 
             W = min(int(self.ent_w.get()), self.MAX_C)
             H_v = min(int(self.ent_h.get()), self.MAX_F)
         except: return 
+        
         S, P = int(s_anc), int(p_ini)
         
+        # --- NUEVA LÓGICA DE INFORMACIÓN SOBRE LA MATRIZ ---
+        # Obtenemos la referencia legible (Libro, Cap, Ver) usando pandas
+        ref_texto = gestor.obtener_referencia(self.df_idx, P) 
+        
+        # Actualizamos la etiqueta con el formato solicitado y colores resaltados
+        self.lbl_info_matriz.config(
+            text=f"ANCLA: {self.ent_ancla.get().upper()}  |  UBICACIÓN: {ref_texto}  |  SALTO: {S}",
+            fg="#d93025",  # Rojo oscuro para resaltar
+            bg="#fff9c4"   # Amarillo suave de fondo
+        )
+        # --------------------------------------------------
+
         # --- Lógica de obtención de matriz ---
-        factor = self.division_actual + 1; S_v = S // factor if self.division_actual > 0 else S
+        factor = self.division_actual + 1
+        S_v = S // factor if self.division_actual > 0 else S
         if S_v == 0: S_v = 1 if S > 0 else -1
+        
         pal_a = gestor.normalizar_hebreo(self.ent_ancla.get())
+        # El motor procesa la matriz usando los índices y el texto actual
         matriz, m_idx, _, _ = motor.obtener_matriz_vertical_fija(self.texto_actual, P, S_v, W, 80)
         self.matriz_actual_letras, self.matriz_actual_indices = matriz, m_idx
         filas_obtenidas = len(m_idx)        
+        
+        # Diccionario para posicionamiento rápido de letras en la rejilla[cite: 1]
         self.dicc_pos_rapida = {m_idx[f][c]: (f, c) for f in range(filas_obtenidas) for c in range(W)}
         
-        # Calcular desfase visual (f_ini)
+        # Calcular desfase visual (f_ini) para centrar el ancla[cite: 1]
         lv = len(pal_a) + (len(pal_a)-1)*self.division_actual
         f_ini = int(((80//2) + (lv/2 if S>=0 else -lv/2)) - (H_v/2))
 
         # Limpiar celdas antes de pintar
         for f in range(self.MAX_F):
             for c in range(self.MAX_C + 2): 
-                self.celdas[f][c].config(text="", bg="white", fg="black"); self.celdas[f][c].grid_remove()
+                self.celdas[f][c].config(text="", bg="white", fg="black")
+                self.celdas[f][c].grid_remove()
 
-        # Dibujar caracteres base y referencias
+        # Dibujar caracteres base y referencias laterales[cite: 1]
         for fg in range(H_v):
             fr = f_ini + fg
             if 0 <= fr < filas_obtenidas and fg < self.MAX_F:
-                self.celdas[fg][0].config(text=gestor.obtener_referencia(self.df_idx, m_idx[fr][W-1]), fg="gray", bg="#f8f8f8", width=18, anchor="w"); self.celdas[fg][0].grid()
+                # Referencia izquierda
+                self.celdas[fg][0].config(text=gestor.obtener_referencia(self.df_idx, m_idx[fr][W-1]), fg="gray", bg="#f8f8f8", width=18, anchor="w")
+                self.celdas[fg][0].grid()
+                
+                # Letras hebreas (de derecha a izquierda según col_vis)[cite: 1]
                 for c in range(W):
                     col_vis = W - c
                     if col_vis <= self.MAX_C:
-                        self.celdas[fg][col_vis].config(text=matriz[fr][c], width=2); self.celdas[fg][col_vis].grid()
+                        self.celdas[fg][col_vis].config(text=matriz[fr][c], width=2)
+                        self.celdas[fg][col_vis].grid()
+                
+                # Referencia derecha
                 if W + 1 < self.MAX_C + 2:
-                    self.celdas[fg][W+1].config(text=gestor.obtener_referencia(self.df_idx, m_idx[fr][0]), fg="gray", bg="#f8f8f8", width=18, anchor="e"); self.celdas[fg][W+1].grid()
+                    self.celdas[fg][W+1].config(text=gestor.obtener_referencia(self.df_idx, m_idx[fr][0]), fg="gray", bg="#f8f8f8", width=18, anchor="e")
+                    self.celdas[fg][W+1].grid()
 
-        # --- PINTADO ESTRICTO DE ANCLA ---
+        # --- PINTADO ESTRICTO DE ANCLA (Resaltado en amarillo)[cite: 1] ---
         indices_ancla = [(P + (i * S)) % len(self.texto_actual) for i in range(len(pal_a))]
-        # Solo pintamos si TODA la palabra está en el diccionario de la matriz
         if all(idx in self.dicc_pos_rapida for idx in indices_ancla):
             for idx in indices_ancla:
                 fm, mc = self.dicc_pos_rapida[idx]
@@ -340,13 +368,11 @@ class AplicacionELS:
                 if 0 <= f_vis < H_v: 
                     self.celdas[f_vis][W - mc].config(bg="yellow")
 
-        # --- PINTADO ESTRICTO DE BÚSQUEDAS EXTRA ---
+        # --- PINTADO ESTRICTO DE BÚSQUEDAS EXTRA[cite: 1] ---
         for g in self.resultados_secundarios:
             for h in g["hits"]:
                 idxs = [(h["letra_ini"] + (i * h["salto"])) % len(self.texto_actual) for i in range(len(g["palabra"]))]
-                # VERIFICACIÓN CLAVE: que todos los índices existan y estén en el rango visual vertical
                 if all(id in self.dicc_pos_rapida for id in idxs):
-                    # Segunda verificación: ¿Están todas las letras dentro de las filas visibles (f_ini a f_ini + H_v)?
                     if all(0 <= (self.dicc_pos_rapida[id][0] - f_ini) < H_v for id in idxs):
                         for id in idxs:
                             fm, mc = self.dicc_pos_rapida[id]
