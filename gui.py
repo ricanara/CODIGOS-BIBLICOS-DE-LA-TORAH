@@ -80,11 +80,31 @@ class AplicacionELS:
         tk.Button(p_u, text="-", width=2, command=lambda: self.ajustar_dim(self.ent_h, -1)).grid(row=0, column=6, padx=2)
         tk.Button(p_u, text="+", width=2, command=lambda: self.ajustar_dim(self.ent_h, 1)).grid(row=0, column=7, padx=2)
 
-        # 2. Búsqueda Global
+        # 2. Búsqueda Global (En gui.py)
         p_s = tk.LabelFrame(self.frame_izq, text=" 2. Búsqueda Global ", padx=10, pady=5)
         p_s.pack(fill="x", padx=10, pady=5)
         tk.Label(p_s, text="Libro:").grid(row=0, column=0)
-        self.cb_libro = ttk.Combobox(p_s, values=["GENESIS", "EXODO", "LEVITICO", "NUMEROS", "DEUTERONOMIO", "TORAH"], width=15); self.cb_libro.grid(row=0, column=1, columnspan=2); self.cb_libro.current(5)
+        
+        # Lista organizada según el orden del manuscrito (Torah, Nevi'im, Ketuvim)
+        libros_completos = [
+            # Torah
+            "GENESIS", "EXODO", "LEVITICO", "NUMEROS", "DEUTERONOMIO",
+            # Nevi'im
+            "JOSUE", "JUECES", "1SAMUEL", "2SAMUEL", "1REYES", "2REYES",
+            "ISAIAS", "JEREMIAS", "EZEQUIEL", "OSEAS", "JOEL", "AMOS",
+            "ABDIAS", "JONAS", "MIQUEAS", "NAHUM", "HABACUC", "SOFONIAS",
+            "HAGEO", "ZACARIAS", "MALAQUIAS",
+            # Ketuvim
+            "SALMOS", "PROVERBIOS", "JOB", "CANTARES", "RUT", "LAMENTACIONES",
+            "ECLESIASTES", "ESTER", "DANIEL", "ESDRAS", "NEHEMIAS", 
+            "1CRONICAS", "2CRONICAS",
+            # Especiales
+            "TORAH", "TANAJ"
+        ]
+        
+        self.cb_libro = ttk.Combobox(p_s, values=libros_completos, width=15)
+        self.cb_libro.grid(row=0, column=1, columnspan=2)
+        self.cb_libro.set("TORAH") # Valor inicial
         
         tk.Label(p_s, text="ANCLA:", font=("Arial", 9, "bold"), fg="blue").grid(row=1, column=0)
         self.ent_ancla = tk.Entry(p_s, justify="right", font=("Arial", 10, "bold"), width=15)

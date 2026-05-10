@@ -3,7 +3,25 @@ import pandas as pd
 import numpy as np
 import re
 
-MAPA_LIBROS = {1: "Génesis", 2: "Éxodo", 3: "Levítico", 4: "Números", 5: "Deuteronomio", 6: "Torah"}
+MAPA_LIBROS = {
+    # TORA (Instrucción)
+    1: "Génesis", 2: "Éxodo", 3: "Levítico", 4: "Números", 5: "Deuteronomio",
+    
+    # NEVI'IM (Profetas)
+    6: "Josué", 7: "Jueces", 8: "1 Samuel", 9: "2 Samuel", 10: "1 Reyes", 
+    11: "2 Reyes", 12: "Isaías", 13: "Jeremías", 14: "Ezequiel", 15: "Oseas", 
+    16: "Joel", 17: "Amós", 18: "Abdías", 19: "Jonás", 20: "Miqueas", 
+    21: "Nahum", 22: "Habacuc", 23: "Sofonías", 24: "Hageo", 25: "Zacarías", 
+    26: "Malaquías",
+    
+    # KETUVIM (Escritos)
+    27: "Salmos", 28: "Proverbios", 29: "Job", 30: "Cantares", 31: "Rut", 
+    32: "Lamentaciones", 33: "Eclesiastés", 34: "Ester", 35: "Daniel", 
+    36: "Esdras", 37: "Nehemías", 38: "1 Crónicas", 39: "2 Crónicas",
+    
+    # ARCHIVOS ESPECIALES
+    40: "Torah", 41: "Tanaj"
+}
 
 def normalizar_hebreo(texto):
     """Convierte letras Sofit (finales) en sus versiones normales."""
