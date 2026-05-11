@@ -331,7 +331,7 @@ class AplicacionELS:
     def set_foco(self, entry): self.ultimo_foco = entry
     def abrir_teclado(self): TecladoHebreo(self.ventana, self.insertar_letra, self.borrar_letra)
     def insertar_letra(self, letra): 
-        if self.ultimo_foco: self.ultimo_foco.insert(tk.INSERT, letra)
+        if self.ultimo_foco: self.ultimo_foco.insert(0, letra)
     def borrar_letra(self):
         if self.ultimo_foco:
             p = self.ultimo_foco.index(tk.INSERT)
