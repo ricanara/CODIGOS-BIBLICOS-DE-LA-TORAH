@@ -331,7 +331,12 @@ class AplicacionELS:
     def set_foco(self, entry): self.ultimo_foco = entry
     def abrir_teclado(self): TecladoHebreo(self.ventana, self.insertar_letra, self.borrar_letra)
     def insertar_letra(self, letra): 
-        if self.ultimo_foco: self.ultimo_foco.insert(0, letra)
+        if self.ultimo_foco:
+             # 1. Insertamos al final para mantener el orden lógico correcto (א -> ב -> ג)
+            self.ultimo_foco.insert(tk.END, letra)
+            # 2. Forzamos a que el campo muestre el final (borde derecho)
+            self.ultimo_foco.xview_moveto(1.0)
+
     def borrar_letra(self):
         if self.ultimo_foco:
             p = self.ultimo_foco.index(tk.INSERT)
