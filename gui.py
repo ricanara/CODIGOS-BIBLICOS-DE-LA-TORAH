@@ -360,7 +360,7 @@ class AplicacionELS:
         except: return 
         
         ref_texto = gestor.obtener_referencia(self.df_idx, p_ini) 
-        self.lbl_info_matriz.config(text=f"ANCLA: {self.ent_ancla.get().upper()}  |  UBICACIÓN: {ref_texto}  |  SALTO: {s_anc}", fg="#d93025", bg="#fff9c4")
+        self.lbl_info_matriz.config(text=f"ANCLA: {self.ent_ancla.get().upper()}  |  UBICACIÓN: {ref_texto}  |  SALTO: {s_anc * -1}", fg="#d93025", bg="#fff9c4")
 
         factor = self.division_actual + 1
         s_v = (s_anc // factor) if self.division_actual > 0 else s_anc
@@ -486,7 +486,8 @@ class AplicacionELS:
                 vis = {idx for fila in m_idx for idx in fila}
                 if all(((r['letra_ini'] + (i * r['salto'])) % len(self.texto_actual)) in vis for i in range(len(pal_a))):
                     num_e = sum(1 for g in self.resultados_secundarios for h in g["hits"] if all(((h["letra_ini"] + (i*h["salto"])) % len(self.texto_actual)) in vis for i in range(len(g["palabra"]))))
-                    self.tabla.insert("", "end", values=(r['salto'], num_e, gestor.obtener_referencia(self.df_idx, r['letra_ini'])), tags=(r['letra_ini'], r['salto']))
+                    salto_invertido = r['salto'] * -1
+                    self.tabla.insert("", "end", values=(salto_invertido, num_e, gestor.obtener_referencia(self.df_idx, r['letra_ini'])), tags=(r['letra_ini'], r['salto']))
             self.lbl_timer.config(text=f"Tiempo: {time.time()-st:.2f}s"); self.btn_run.config(text="BUSCAR ENCUENTROS", state="normal")
         except Exception as e: 
             self.btn_run.config(text="BUSCAR ENCUENTROS", state="normal"); messagebox.showerror("Error", str(e))
