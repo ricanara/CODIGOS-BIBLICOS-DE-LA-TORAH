@@ -477,7 +477,7 @@ class AplicacionELS:
             st = time.time(); self.btn_run.config(text="BUSCANDO...", state="disabled")
             self.texto_actual, self.df_idx = gestor.cargar_recursos(self.ruta_datos, self.cb_libro.get())
             s_min, s_max, W, H = int(self.ent_min.get()), int(self.ent_max.get()), int(self.ent_w.get()), int(self.ent_h.get())
-            pal_a = gestor.normalizar_hebreo(self.ent_ancla.get().strip())
+            pal_a = gestor.normalizar_hebreo(self.ent_ancla.get().strip())[::-1]
             res_a, _ = motor.buscar_els_cilindrico(self.texto_actual, pal_a, s_min, s_max)
             self.resultados_secundarios = [{"palabra": gestor.normalizar_hebreo(e.get().strip()), "hits": motor.buscar_els_cilindrico(self.texto_actual, gestor.normalizar_hebreo(e.get().strip()), s_min, s_max)[0], "color": self.colores_extra[i]} for i, e in enumerate(self.entries_extra) if e.get().strip()]
             for i in self.tabla.get_children(): self.tabla.delete(i)
