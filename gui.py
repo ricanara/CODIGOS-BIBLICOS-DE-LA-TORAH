@@ -358,20 +358,31 @@ class AplicacionELS:
     def actualizar_visor(self, event):
         if not self.tabla.selection(): return
         item = self.tabla.selection()[0]
+        # p_ini es el índice de inicio, s_anc es el valor del salto
         p_ini, s_anc = map(int, self.tabla.item(item, "tags"))
         
         try: 
             W, H_v = min(int(self.ent_w.get()), self.MAX_C), min(int(self.ent_h.get()), self.MAX_F)
         except: return 
-        
-        ref_texto = gestor.obtener_referencia(self.df_idx, p_ini) 
-        self.lbl_info_matriz.config(text=f"ANCLA: {self.ent_ancla.get().upper()}  |  UBICACIÓN: {ref_texto}  |  SALTO: {s_anc * -1}", fg="#d93025", bg="#fff9c4")
 
+        # --- CÁLCULO DE LA UBICACIÓN FINAL DEL ANCLA ---
+        pal_a = gestor.normalizar_hebreo(self.ent_ancla.get())
+        # Calculamos la posición de la última letra usando aritmética modular
+        p_fin = (p_ini + (len(pal_a) - 1) * s_anc) % len(self.texto_actual)
+        
+        # Obtenemos la referencia (Libro, Cap, Ver) basándonos en el final (p_fin)
+        ref_texto = gestor.obtener_referencia(self.df_idx, p_fin) 
+        self.lbl_info_matriz.config(
+            text=f"ANCLA: {self.ent_ancla.get().upper()}  |  UBICACIÓN: {ref_texto}  |  SALTO: {s_anc * -1}", 
+            fg="#d93025", 
+            bg="#fff9c4"
+        )
+
+        # --- LÓGICA DE CONSTRUCCIÓN DE MATRIZ ---
         factor = self.division_actual + 1
         s_v = (s_anc // factor) if self.division_actual > 0 else s_anc
         if s_v == 0: s_v = 1 if s_anc > 0 else -1
         
-        pal_a = gestor.normalizar_hebreo(self.ent_ancla.get())
         matriz, m_idx, _, _ = motor.obtener_matriz_vertical_fija(self.texto_actual, p_ini, s_v, W, 80)
         self.matriz_actual_letras, self.matriz_actual_indices = matriz, m_idx
         filas_obt = len(m_idx)        
@@ -386,7 +397,7 @@ class AplicacionELS:
                 self.celdas[f][c].config(text="", bg="white", fg="black")
                 self.celdas[f][c].grid_remove()
 
-        # 2. Dibujo de la matriz y referencias
+        # 2. Dibujo de la matriz y referencias laterales
         for fg in range(H_v):
             fr = f_ini + fg
             if 0 <= fr < filas_obt:
@@ -408,38 +419,28 @@ class AplicacionELS:
                 f_vis = fm - f_ini
                 if 0 <= f_vis < H_v: self.celdas[f_vis][W - mc].config(bg="yellow")
 
-        # 4. --- PINTADO DINÁMICO DE ENCUENTROS EXTRA ---
-        # Paleta de colores para diferenciar cada encuentro individual
+        # 4. Pintado de encuentros extra
         colores_extra_dinamicos = [
             "#FFB6C1", "#90EE90", "#ADD8E6", "#FFD700", "#E6E6FA", 
-            "#F5DEB3", "#B0E0E6", "#D8BFD8", "#F0E68C", "#AFEEEE",
-            "#FF7F50", "#7FFFD4", "#DEB887", "#98FB98", "#B0C4DE"
+            "#F5DEB3", "#B0E0E6", "#D8BFD8", "#F0E68C", "#AFEEEE"
         ]
         color_idx = 0
 
         for g in self.resultados_secundarios:
             for h in g["hits"]:
-                # Obtener índices de la palabra completa
                 idxs = [(h["letra_ini"] + (i * h["salto"])) % len(self.texto_actual) for i in range(len(g["palabra"]))]
-                
-                # Verificar si TODAS las letras están en la matriz total
                 if all(idx in self.dicc_pos_rapida for idx in idxs):
                     esta_completa_en_pantalla = True
                     coordenadas_a_pintar = []
-                    
                     for idx in idxs:
                         fm, mc = self.dicc_pos_rapida[idx]
                         f_vis = fm - f_ini
-                        # Verificar si la letra cae dentro del umbral visual (H_v)
                         if 0 <= f_vis < H_v:
                             coordenadas_a_pintar.append((f_vis, W - mc))
                         else:
                             esta_completa_en_pantalla = False
                             break
-                    
-                    # Solo pintamos si la palabra se ve completa en el visor
                     if esta_completa_en_pantalla:
-                        # Asignamos un color de la paleta y rotamos para el siguiente encuentro
                         color_actual = colores_extra_dinamicos[color_idx % len(colores_extra_dinamicos)]
                         for f_v, c_v in coordenadas_a_pintar:
                             if 0 < c_v <= self.MAX_C:
@@ -518,7 +519,7 @@ class AplicacionELS:
         if not archivo or not self.matriz_actual_letras or not self.tabla.selection(): return
         try:
             W, H, s_anc = int(self.ent_w.get()), int(self.ent_h.get()), self.tabla.item(self.tabla.selection()[0], "tags")[1]
-            html = f"<html><head><meta charset='UTF-8'><style>body {{ background-color: #f0f7f0; font-family: 'Segoe UI', sans-serif; padding: 40px; display: flex; flex-direction: column; align-items: center; }} .header-card {{ background: #ffffff; padding: 20px 40px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-left: 6px solid #2e7d32; margin-bottom: 30px; text-align: center; min-width: 600px; }} .header-card h2 {{ margin: 0; color: #1b5e20; font-size: 22px; }} .header-card p {{ margin: 8px 0 0; color: #666; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }} table {{ border-collapse: separate; border-spacing: 2px; background-color: #ffffff; padding: 25px; border-radius: 10px; box-shadow: 0 15px 35px rgba(0,0,0,0.1); }} td {{ width: 32px; height: 32px; text-align: center; font-family: 'Courier New', monospace; font-size: 18px; font-weight: bold; border-radius: 4px; border: 1px solid #f0f0f0; }} .ref {{ font-size: 11px; color: #2e7d32; background-color: #e8f5e9 !important; min-width: 150px; padding: 0 12px; }} </style></head><body><div class='header-card'><h2>INFORME DE BÚSQUEDA ELS</h2><p>ANCLA: <b>{gestor.normalizar_hebreo(self.ent_ancla.get())}</b> &nbsp;|&nbsp; LIBRO: <b>{self.cb_libro.get()}</b> &nbsp;|&nbsp; SALTO: <b>{s_anc}</b></p></div><table>"
+            html = f"<html><head><meta charset='UTF-8'><style>body {{ background-color: #f0f7f0; font-family: 'Segoe UI', sans-serif; padding: 40px; display: flex; flex-direction: column; align-items: center; }} .header-card {{ background: #ffffff; padding: 20px 40px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-left: 6px solid #2e7d32; margin-bottom: 30px; text-align: center; min-width: 600px; }} .header-card h2 {{ margin: 0; color: #1b5e20; font-size: 30px; }} .header-card p {{ margin: 8px 0 0; color: #666; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }} table {{ border-collapse: separate; border-spacing: 2px; background-color: #ffffff; padding: 25px; border-radius: 10px; box-shadow: 0 15px 35px rgba(0,0,0,0.1); }} td {{ width: 32px; height: 32px; text-align: center; font-family: 'Courier New', monospace; font-size: 18px; font-weight: bold; border-radius: 4px; border: 1px solid #f0f0f0; }} .ref {{ font-size: 11px; color: #2e7d32; background-color: #e8f5e9 !important; min-width: 150px; padding: 0 12px; }} </style></head><body><div class='header-card'><h2>INFORME DE BÚSQUEDA ELS</h2><p>ANCLA: <b>{gestor.normalizar_hebreo(self.ent_ancla.get())}</b> &nbsp;|&nbsp; LIBRO: <b>{self.cb_libro.get()}</b> &nbsp;|&nbsp; SALTO: <b>{s_anc}</b></p></div><table>"
             for f_idx in range(H):
                 html += "<tr>"
                 for c_idx in range(W + 2):
