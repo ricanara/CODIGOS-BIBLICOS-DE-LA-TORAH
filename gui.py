@@ -358,27 +358,25 @@ class AplicacionELS:
     def actualizar_visor(self, event):
         if not self.tabla.selection(): return
         item = self.tabla.selection()[0]
-        # p_ini es el índice de inicio, s_anc es el valor del salto
         p_ini, s_anc = map(int, self.tabla.item(item, "tags"))
         
         try: 
-            W, H_v = min(int(self.ent_w.get()), self.MAX_C), min(int(self.ent_h.get()), self.MAX_F)
+            W = min(int(self.ent_w.get()), self.MAX_C)
+            H_v = min(int(self.ent_h.get()), self.MAX_F)
         except: return 
 
-        # --- CÁLCULO DE LA UBICACIÓN FINAL DEL ANCLA ---
+        # 1. CÁLCULO DE UBICACIÓN FINAL
         pal_a = gestor.normalizar_hebreo(self.ent_ancla.get())
-        # Calculamos la posición de la última letra usando aritmética modular
-        p_fin = (p_ini + (len(pal_a) - 1) * s_anc) % len(self.texto_actual)
-        
-        # Obtenemos la referencia (Libro, Cap, Ver) basándonos en el final (p_fin)
+        largo_pal = len(pal_a)
+        p_fin = (p_ini + (largo_pal - 1) * s_anc) % len(self.texto_actual)
         ref_texto = gestor.obtener_referencia(self.df_idx, p_fin) 
+        
         self.lbl_info_matriz.config(
-            text=f"ANCLA: {self.ent_ancla.get().upper()}  |  UBICACIÓN: {ref_texto}  |  SALTO: {s_anc * -1}", 
-            fg="#d93025", 
-            bg="#fff9c4"
+            text=f"ANCLA: {pal_a.upper()}  |  UBICACIÓN: {ref_texto}  |  SALTO: {s_anc * -1}", 
+            fg="#d93025", bg="#fff9c4"
         )
 
-        # --- LÓGICA DE CONSTRUCCIÓN DE MATRIZ ---
+        # 2. OBTENCIÓN DE MATRIZ
         factor = self.division_actual + 1
         s_v = (s_anc // factor) if self.division_actual > 0 else s_anc
         if s_v == 0: s_v = 1 if s_anc > 0 else -1
@@ -388,63 +386,63 @@ class AplicacionELS:
         filas_obt = len(m_idx)        
         self.dicc_pos_rapida = {m_idx[f][c]: (f, c) for f in range(filas_obt) for c in range(W)}
         
-        lv = len(pal_a) + (len(pal_a)-1)*self.division_actual
+        lv = largo_pal + (largo_pal-1)*self.division_actual
         f_ini = int(((80//2) + (lv/2 if s_anc>=0 else -lv/2)) - (H_v/2))
 
-        # 1. Limpieza de celdas
+        # 3. LIMPIEZA Y PREPARACIÓN DE CELDAS
         for f in range(self.MAX_F):
-            for c in range(self.MAX_C + 2): 
-                self.celdas[f][c].config(text="", bg="white", fg="black")
-                self.celdas[f][c].grid_remove()
+            for c in range(self.MAX_C + 2):
+                self.celdas[f][c].config(text="", bg="white")
+                if f < H_v and c <= W + 1:
+                    self.celdas[f][c].grid()
+                else:
+                    self.celdas[f][c].grid_remove()
 
-        # 2. Dibujo de la matriz y referencias laterales
+        # 4. DIBUJO DE MATRIZ (CORREGIDO)
         for fg in range(H_v):
             fr = f_ini + fg
             if 0 <= fr < filas_obt:
+                # Referencia Izquierda (columna 0)
                 self.celdas[fg][0].config(text=gestor.obtener_referencia(self.df_idx, m_idx[fr][W-1]), fg="gray", bg="#f8f8f8", width=18, anchor="w")
-                self.celdas[fg][0].grid()
+                
+                # Letras Centrales (Espejo para Hebreo RTL)
                 for c in range(W):
-                    cv = W - c
-                    if cv <= self.MAX_C:
-                        self.celdas[fg][cv].config(text=matriz[fr][c], width=2); self.celdas[fg][cv].grid()
-                if W + 1 < self.MAX_C + 2:
-                    self.celdas[fg][W+1].config(text=gestor.obtener_referencia(self.df_idx, m_idx[fr][0]), fg="gray", bg="#f8f8f8", width=18, anchor="e")
-                    self.celdas[fg][W+1].grid()
+                    # El índice de columna visual debe ser W - c para no solapar con la referencia
+                    col_visual = W - c
+                    if col_visual <= self.MAX_C:
+                        self.celdas[fg][col_visual].config(text=matriz[fr][c], width=2)
+                
+                # Referencia Derecha (columna W + 1)
+                self.celdas[fg][W+1].config(text=gestor.obtener_referencia(self.df_idx, m_idx[fr][0]), fg="gray", bg="#f8f8f8", width=18, anchor="e")
 
-        # 3. Pintado del ANCLA (Amarillo)
-        indices_ancla = [(p_ini + (i * s_anc)) % len(self.texto_actual) for i in range(len(pal_a))]
+        # 5. PINTADO DEL ANCLA
+        indices_ancla = [(p_ini + (i * s_anc)) % len(self.texto_actual) for i in range(largo_pal)]
         for idx in indices_ancla:
             if idx in self.dicc_pos_rapida:
                 fm, mc = self.dicc_pos_rapida[idx]
                 f_vis = fm - f_ini
-                if 0 <= f_vis < H_v: self.celdas[f_vis][W - mc].config(bg="yellow")
+                if 0 <= f_vis < H_v: 
+                    # Usamos la misma lógica W - mc para pintar el lugar correcto
+                    self.celdas[f_vis][W - mc].config(bg="yellow")
 
-        # 4. Pintado de encuentros extra
-        colores_extra_dinamicos = [
-            "#FFB6C1", "#90EE90", "#ADD8E6", "#FFD700", "#E6E6FA", 
-            "#F5DEB3", "#B0E0E6", "#D8BFD8", "#F0E68C", "#AFEEEE"
-        ]
+        # 6. PINTADO DE ENCUENTROS EXTRA
+        colores_extra_dinamicos = ["#FFB6C1", "#90EE90", "#ADD8E6", "#FFD700", "#E6E6FA", "#F5DEB3", "#B0E0E6", "#D8BFD8", "#F0E68C", "#AFEEEE"]
         color_idx = 0
-
         for g in self.resultados_secundarios:
             for h in g["hits"]:
                 idxs = [(h["letra_ini"] + (i * h["salto"])) % len(self.texto_actual) for i in range(len(g["palabra"]))]
                 if all(idx in self.dicc_pos_rapida for idx in idxs):
-                    esta_completa_en_pantalla = True
-                    coordenadas_a_pintar = []
+                    esta_completa = True
+                    coords = []
                     for idx in idxs:
                         fm, mc = self.dicc_pos_rapida[idx]
                         f_vis = fm - f_ini
-                        if 0 <= f_vis < H_v:
-                            coordenadas_a_pintar.append((f_vis, W - mc))
-                        else:
-                            esta_completa_en_pantalla = False
-                            break
-                    if esta_completa_en_pantalla:
-                        color_actual = colores_extra_dinamicos[color_idx % len(colores_extra_dinamicos)]
-                        for f_v, c_v in coordenadas_a_pintar:
-                            if 0 < c_v <= self.MAX_C:
-                                self.celdas[f_v][c_v].config(bg=color_actual)
+                        if 0 <= f_vis < H_v: coords.append((f_vis, W - mc))
+                        else: esta_completa = False; break
+                    if esta_completa:
+                        c_act = colores_extra_dinamicos[color_idx % len(colores_extra_dinamicos)]
+                        for f_v, c_v in coords:
+                            if 0 < c_v <= self.MAX_C: self.celdas[f_v][c_v].config(bg=c_act)
                         color_idx += 1
         
     def ejecutar_busqueda_local(self):
