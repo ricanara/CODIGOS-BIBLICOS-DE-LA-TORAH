@@ -64,7 +64,7 @@ class AplicacionELS:
         self.frame_izq = tk.Frame(self.paned); self.paned.add(self.frame_izq, width=350)
 
         # 1. Dimensiones
-        p_u = tk.LabelFrame(self.frame_izq, text=" 1. Dimensiones del Umbral ", padx=10, pady=10)
+        p_u = tk.LabelFrame(self.frame_izq, text=" 1. Dimensiones de la matriz ", padx=10, pady=10)
         p_u.pack(fill="x", padx=10, pady=5)
         tk.Label(p_u, text="Ancho:").grid(row=0, column=0)
         self.ent_w = tk.Entry(p_u, width=5); self.ent_w.insert(0, "30"); self.ent_w.grid(row=0, column=1)
