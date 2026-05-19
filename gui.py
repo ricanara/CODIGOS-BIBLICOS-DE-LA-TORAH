@@ -481,19 +481,46 @@ class AplicacionELS:
             self.texto_actual, self.df_idx = gestor.cargar_recursos(self.ruta_datos, self.cb_libro.get())
             s_min, s_max, W, H = int(self.ent_min.get()), int(self.ent_max.get()), int(self.ent_w.get()), int(self.ent_h.get())
             pal_a = gestor.normalizar_hebreo(self.ent_ancla.get().strip())
+            
+            # 1. Búsqueda principal (Función con 'i' latina corregida)
             res_a, _ = motor.buscar_els_cilindrico(self.texto_actual, pal_a, s_min, s_max)
+            
+            # 2. Búsquedas secundarias (Función con 'i' latina corregida)
             self.resultados_secundarios = [{"palabra": gestor.normalizar_hebreo(e.get().strip()), "hits": motor.buscar_els_cilindrico(self.texto_actual, gestor.normalizar_hebreo(e.get().strip()), s_min, s_max)[0], "color": self.colores_extra[i]} for i, e in enumerate(self.entries_extra) if e.get().strip()]
+            
             for i in self.tabla.get_children(): self.tabla.delete(i)
             
-            for r in res_a:
+            # --- CONTROL INTELIGENTE DE LA BARRA DE PROGRESO ---
+            total_resultados = len(res_a)
+            self.progreso['value'] = 0
+            if total_resultados > 0:
+                self.progreso['maximum'] = total_resultados
+            else:
+                self.progreso['maximum'] = 100
+            
+            frecuencia_actualizacion = max(1, total_resultados // 100) 
+            # --------------------------------------------------
+
+            for idx_progreso, r in enumerate(res_a):
                 _, m_idx, _, _ = motor.obtener_matriz_vertical_fija(self.texto_actual, r['letra_ini'], r['salto'], W, H)
                 vis = {idx for fila in m_idx for idx in fila}
                 if all(((r['letra_ini'] + (i * r['salto'])) % len(self.texto_actual)) in vis for i in range(len(pal_a))):
                     num_e = sum(1 for g in self.resultados_secundarios for h in g["hits"] if all(((h["letra_ini"] + (i*h["salto"])) % len(self.texto_actual)) in vis for i in range(len(g["palabra"]))))
                     
-                    # Insertar directamente r['salto'] en lugar de salto_invertido
+                    # Insertar directamente r['salto'] sin inversión (* -1)
                     self.tabla.insert("", "end", values=(r['salto'], num_e, gestor.obtener_referencia(self.df_idx, r['letra_ini'])), tags=(r['letra_ini'], r['salto']))
+                
+                # --- ACTUALIZACIÓN DE BARRA EN INTERVALOS CONTROLADOS ---
+                actual = idx_progreso + 1
+                self.progreso['value'] = actual
+                if actual % frecuencia_actualizacion == 0 or actual == total_resultados:
+                    self.ventana.update_idletasks()
+                # -------------------------------------------------------
             
+            if total_resultados > 0:
+                self.progreso['value'] = total_resultados
+                self.ventana.update_idletasks()
+
             self.lbl_timer.config(text=f"Tiempo: {time.time()-st:.2f}s"); self.btn_run.config(text="BUSCAR ENCUENTROS", state="normal")
         except Exception as e: 
             self.btn_run.config(text="BUSCAR ENCUENTROS", state="normal"); messagebox.showerror("Error", str(e))
