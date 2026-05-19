@@ -368,8 +368,7 @@ class AplicacionELS:
         # 1. CÁLCULO DE UBICACIÓN FINAL
         pal_a = gestor.normalizar_hebreo(self.ent_ancla.get())
         largo_pal = len(pal_a)
-        p_fin = (p_ini + (largo_pal - 1) * s_anc) % len(self.texto_actual)
-        ref_texto = gestor.obtener_referencia(self.df_idx, p_fin) 
+        ref_texto = gestor.obtener_referencia(self.df_idx, p_ini)
         
         self.lbl_info_matriz.config(
             text=f"ANCLA: {pal_a.upper()}  |  UBICACIÓN: {ref_texto}  |  SALTO: {s_anc}", 
