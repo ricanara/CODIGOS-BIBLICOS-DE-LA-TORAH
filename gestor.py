@@ -24,10 +24,17 @@ MAPA_LIBROS = {
 }
 
 def normalizar_hebreo(texto):
-    """Convierte letras Sofit (finales) en sus versiones normales."""
+    """Elimina signos masoréticos (Nequdot) y convierte letras Sofit (finales) en normales."""
+    if not texto:
+        return ""
+        
+    # 1. ELIMINAR VOCALES Y DIACRÍTICOS HEBREOS (Rango Unicode \u0591 a \u05C7)
+    texto_sin_vocales = re.sub(r'[\u0591-\u05C7]', '', texto)
+    
+    # 2. NORMALIZAR LETRAS SOFIT (Tu lógica existente intacta)
     # ך -> כ, ם -> מ, ן -> נ, ף -> פ, ץ -> צ
     tab_sofit = str.maketrans("ךםןףץ", "כמנפצ")
-    return texto.translate(tab_sofit)
+    return texto_sin_vocales.translate(tab_sofit)
 
 def cargar_recursos(ruta_base, nombre_libro):
     r_bin = os.path.join(ruta_base, f"{nombre_libro.lower()}.bin")
@@ -39,10 +46,10 @@ def cargar_recursos(ruta_base, nombre_libro):
     with open(r_bin, 'r', encoding='utf-8') as f:
         contenido = f.read()
         
-        # 1. Normalizamos las Sofit que puedan venir en el archivo original
+        # 1. Normalizamos las Sofit y removemos diacríticos del archivo binario
         contenido_norm = normalizar_hebreo(contenido)
         
-        # 2. FILTRO CRÍTICO: Solo dejamos caracteres hebreos
+        # 2. FILTRO CRÍTICO: Solo dejamos caracteres hebreos consonánticos
         texto_limpio = "".join(re.findall(r'[\u0590-\u05FF]', contenido_norm))
         
     if not texto_limpio:
