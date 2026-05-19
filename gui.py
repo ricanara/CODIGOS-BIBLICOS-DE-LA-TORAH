@@ -372,7 +372,7 @@ class AplicacionELS:
         ref_texto = gestor.obtener_referencia(self.df_idx, p_fin) 
         
         self.lbl_info_matriz.config(
-            text=f"ANCLA: {pal_a.upper()}  |  UBICACIÓN: {ref_texto}  |  SALTO: {s_anc * -1}", 
+            text=f"ANCLA: {pal_a.upper()}  |  UBICACIÓN: {ref_texto}  |  SALTO: {s_anc}", 
             fg="#d93025", bg="#fff9c4"
         )
 
@@ -481,17 +481,20 @@ class AplicacionELS:
             st = time.time(); self.btn_run.config(text="BUSCANDO...", state="disabled")
             self.texto_actual, self.df_idx = gestor.cargar_recursos(self.ruta_datos, self.cb_libro.get())
             s_min, s_max, W, H = int(self.ent_min.get()), int(self.ent_max.get()), int(self.ent_w.get()), int(self.ent_h.get())
-            pal_a = gestor.normalizar_hebreo(self.ent_ancla.get().strip())[::-1]
+            pal_a = gestor.normalizar_hebreo(self.ent_ancla.get().strip())
             res_a, _ = motor.buscar_els_cilindrico(self.texto_actual, pal_a, s_min, s_max)
             self.resultados_secundarios = [{"palabra": gestor.normalizar_hebreo(e.get().strip()), "hits": motor.buscar_els_cilindrico(self.texto_actual, gestor.normalizar_hebreo(e.get().strip()), s_min, s_max)[0], "color": self.colores_extra[i]} for i, e in enumerate(self.entries_extra) if e.get().strip()]
             for i in self.tabla.get_children(): self.tabla.delete(i)
+            
             for r in res_a:
                 _, m_idx, _, _ = motor.obtener_matriz_vertical_fija(self.texto_actual, r['letra_ini'], r['salto'], W, H)
                 vis = {idx for fila in m_idx for idx in fila}
                 if all(((r['letra_ini'] + (i * r['salto'])) % len(self.texto_actual)) in vis for i in range(len(pal_a))):
                     num_e = sum(1 for g in self.resultados_secundarios for h in g["hits"] if all(((h["letra_ini"] + (i*h["salto"])) % len(self.texto_actual)) in vis for i in range(len(g["palabra"]))))
-                    salto_invertido = r['salto'] * -1
-                    self.tabla.insert("", "end", values=(salto_invertido, num_e, gestor.obtener_referencia(self.df_idx, r['letra_ini'])), tags=(r['letra_ini'], r['salto']))
+                    
+                    # Insertar directamente r['salto'] en lugar de salto_invertido
+                    self.tabla.insert("", "end", values=(r['salto'], num_e, gestor.obtener_referencia(self.df_idx, r['letra_ini'])), tags=(r['letra_ini'], r['salto']))
+            
             self.lbl_timer.config(text=f"Tiempo: {time.time()-st:.2f}s"); self.btn_run.config(text="BUSCAR ENCUENTROS", state="normal")
         except Exception as e: 
             self.btn_run.config(text="BUSCAR ENCUENTROS", state="normal"); messagebox.showerror("Error", str(e))
